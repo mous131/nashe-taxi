@@ -4,8 +4,8 @@ module.exports = async (req, res) => {
   try {
     // 1. Токен лучше хранить в настройках Vercel, но для теста можно тут
     // РЕКОМЕНДАЦИЯ: Вставьте сюда свой токен, потом уберем
-    const BOT_TOKEN = 'ВАШ_ТОКЕН_ОТ_BOTFATHER'; 
-    const WEB_APP_URL = 'https://ВАШ_НИК.github.io/nashe-taxi/';
+   const BOT_TOKEN = process.env.BOT_TOKEN;
+    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/';
 
     const bot = new Telegraf(BOT_TOKEN);
     const { body } = req;
