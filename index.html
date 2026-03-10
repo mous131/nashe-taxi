@@ -4,144 +4,131 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Наше Такси</title>
-    <!-- Подключаем официальную библиотеку Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Подключаем Leaflet (Карты) -->
+    <!-- Подключаем карту -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 15px;
-            background: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+        :root {
+            --bg: var(--tg-theme-bg-color, #ffffff);
+            --text: var(--tg-theme-text-color, #000000);
+            --hint: var(--tg-theme-hint_color, #999999);
+            --secondary-bg: var(--tg-theme-secondary_bg_color, #f4f4f5);
         }
-        h2 { margin-top: 0; text-align: center; }
-        #map { 
-            width: 100%; 
-            height: 200px; 
-            border-radius: 15px; 
-            margin-bottom: 15px;
-            z-index: 1;
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 80px; }
+        
+        /* Карта */
+        #map { width: 100%; height: 40vh; min-height: 250px; z-index: 1; }
+
+        /* Форма */
+        .container { padding: 16px; }
+        .input-card {
+            background: var(--secondary-bg);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
-        .input-group { margin-bottom: 10px; position: relative; }
-        input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 10px;
-            border: 1px solid #ddd;
-            box-sizing: border-box;
-            font-size: 16px;
-            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            color: var(--tg-theme-text-color, #000);
-        }
-        .price-tag {
+        .route-point {
             display: flex;
-            justify-content: space-between;
+            align-items: center;
             padding: 10px 0;
-            font-size: 18px;
-            font-weight: bold;
-            border-bottom: 1px solid #eee;
-            margin-bottom: 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
         }
-        button {
-            width: 100%;
-            padding: 15px;
-            border-radius: 12px;
+        .route-point:last-child { border-bottom: none; }
+        .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            margin-right: 12px;
+        }
+        .dot.from { background: #22c55e; }
+        .dot.to { background: #ef4444; }
+        input {
             border: none;
-            background: #3b82f6; /* Синий цвет по умолчанию */
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: opacity 0.2s;
+            background: transparent;
+            width: 100%;
+            font-size: 16px;
+            color: var(--text);
+            outline: none;
         }
-        button:active { opacity: 0.8; }
     </style>
 </head>
 <body>
 
-    <h2>🚕 Наше Такси</h2>
-
     <!-- Карта -->
     <div id="map"></div>
 
-    <div class="input-group">
-        <input type="text" id="address_from" placeholder="📍 Откуда (определяется автоматически)" readonly>
+    <div class="container">
+        <div class="input-card">
+            <div class="route-point">
+                <div class="dot from"></div>
+                <input type="text" id="input-from" placeholder="Откуда" value="Мое местоположение">
+            </div>
+            <div class="route-point">
+                <div class="dot to"></div>
+                <input type="text" id="input-to" placeholder="Куда едем?">
+            </div>
+        </div>
     </div>
-    <div class="input-group">
-        <input type="text" id="address_to" placeholder="🏁 Куда едем?" focus>
-    </div>
-
-    <div class="price-tag">
-        <span>Ориентировочная цена:</span>
-        <span id="price">350 ₽</span>
-    </div>
-
-    <button id="order_btn">Заказать</button>
 
     <script>
-        // 1. Инициализация Telegram WebApp
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Раскрыть на весь экран
-        tg.MainButton.hide(); // Скрываем стандартную кнопку телеграм (если не используем)
+        tg.expand();
 
-        // Настройка цветов под тему Телеграма
-        document.body.style.backgroundColor = tg.themeParams.bg_color;
-        document.querySelector('button').style.backgroundColor = tg.themeParams.button_color || '#3b82f6';
-        document.querySelector('button').style.color = tg.themeParams.button_text_color || '#ffffff';
-
-        // 2. Инициализация Карты (Москва по умолчанию)
-        var map = L.map('map').setView([55.7558, 37.6173], 13);
+        // 1. Настраиваем карту
+        var map = L.map('map').setView([55.7558, 37.6173], 13); // Москва по умолчанию
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap'
         }).addTo(map);
 
-        // Маркер пользователя
-        var userMarker = L.marker([55.7558, 37.6173]).addTo(map).bindPopup("Вы здесь");
+        // Маркер
+        var marker = L.marker([55.7558, 37.6173]).addTo(map);
 
-        // Определение геолокации
+        // Пробуем определить геолокацию
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition((pos) => {
                 const lat = pos.coords.latitude;
                 const lon = pos.coords.longitude;
                 map.setView([lat, lon], 15);
-                userMarker.setLatLng([lat, lon]);
-                document.getElementById('address_from').value = "Мое местоположение";
-            }, () => {
-                document.getElementById('address_from').value = "Не удалось определить";
+                marker.setLatLng([lat, lon]);
+                document.getElementById('input-from').value = "Я здесь";
             });
         }
 
-        // 3. Логика заказа
-        const orderBtn = document.getElementById("order_btn");
-        orderBtn.addEventListener('click', () => {
-            const to = document.getElementById('address_to').value;
-            const user = tg.initDataUnsafe.user; // Данные пользователя
-
-            if (!to) {
-                tg.showAlert("Пожалуйста, укажите куда ехать!");
+        // 2. Кнопка заказа
+        tg.MainButton.setText("🚕 Вызвать такси");
+        tg.MainButton.show();
+        tg.MainButton.onClick(() => {
+            const to = document.getElementById('input-to').value;
+            if(!to) {
+                tg.showAlert("Куда едем?");
                 return;
             }
 
-            // Показываем статус "Загрузка" на кнопке
-            orderBtn.innerText = "Поиск машины...";
-            orderBtn.disabled = true;
-
-            // Имитация отправки на сервер
-            // В реальности здесь будет fetch('https://ваш-бэкенд.com/order', ...)
-            setTimeout(() => {
+            tg.MainButton.showProgress();
+            
+            // Отправляем заказ на сервер Vercel
+            fetch('https://nashe-taxi.vercel.app/api/order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user: tg.initDataUnsafe.user,
+                    to: to
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                tg.MainButton.hideProgress();
                 tg.showPopup({
-                    title: "🚕 Водитель найден!",
-                    message: `Ваш заказ принят. Ожидайте звонка.\n\nКуда: ${to}`,
-                    buttons: [{ type: "ok" }]
-                }, () => {
-                    // Закрываем приложение
-                    tg.close();
+                    title: "✅ Готово",
+                    message: "Водитель принят! Ожидайте.",
+                    buttons: [{type: "ok"}]
                 });
-            }, 2000); // Имитация поиска 2 секунды
+            })
+            .catch(() => {
+                tg.MainButton.hideProgress();
+                tg.showAlert("Ошибка соединения");
+            });
         });
     </script>
 </body>
