@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
     }
 
     // 3. Ваша ссылка на приложение (ЗАМЕНИТЕ ВАШ_НИК!)
-    const WEB_APP_URL = 'https://ВАШ_НИК.github.io/nashe-taxi/';
+    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/';
 
     const bot = new Telegraf(BOT_TOKEN);
     const body = req.body;
