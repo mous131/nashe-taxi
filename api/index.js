@@ -2,15 +2,17 @@ const { Telegraf } = require('telegraf');
 
 module.exports = async (req, res) => {
   try {
-    // 1. Токен лучше хранить в настройках Vercel, но для теста можно тут
-    // РЕКОМЕНДАЦИЯ: Вставьте сюда свой токен, потом уберем
-   const BOT_TOKEN = process.env.BOT_TOKEN;
-    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/';
+    const BOT_TOKEN = process.env.BOT_TOKEN;
+    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/'; // Замените ссылку!
+
+    if (!BOT_TOKEN) {
+      return res.status(500).send('Server error');
+    }
 
     const bot = new Telegraf(BOT_TOKEN);
     const { body } = req;
 
-    // Обрабатываем обновление от Telegram
+    // 1. Обработка команды /start
     if (body && body.message && body.message.text === '/start') {
       const chatId = body.message.chat.id;
       const firstName = body.message.from.first_name;
@@ -29,12 +31,24 @@ module.exports = async (req, res) => {
           }
         }
       );
+      return res.status(200).send('OK');
+    }
+
+    // 2. Обработка ЗАКАЗА (из приложения)
+    if (body && body.user && body.to) {
+        const userName = body.user.first_name;
+        console.log(`🚕 НОВЫЙ ЗАКАЗ от ${userName} -> ${body.to}`);
+        // Тут можно добавить логику уведомления водителя
+        
+        return res.status(200).json({ ok: true, message: "Заказ принят" });
     }
 
     res.status(200).send('OK');
-  } catch (e) {
-    console.error(e);
+  } catch (error) {
+    console.error('Error:', error);
     res.status(500).send('Error');
+  }
+};
   }
 };
 // --- Новый код для приема заказов ---
