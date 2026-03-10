@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Наше Такси</title>
+    <!-- Подключаем официальную библиотеку Telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Подключаем Leaflet (Карты) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 15px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        h2 { margin-top: 0; text-align: center; }
+        #map { 
+            width: 100%; 
+            height: 200px; 
+            border-radius: 15px; 
+            margin-bottom: 15px;
+            z-index: 1;
+        }
+        .input-group { margin-bottom: 10px; position: relative; }
+        input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+            font-size: 16px;
+            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            color: var(--tg-theme-text-color, #000);
+        }
+        .price-tag {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 18px;
+            font-weight: bold;
+            border-bottom: 1px solid #eee;
+            margin-bottom: 15px;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            background: #3b82f6; /* Синий цвет по умолчанию */
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+    <h2>🚕 Наше Такси</h2>
+
+    <!-- Карта -->
+    <div id="map"></div>
+
+    <div class="input-group">
+        <input type="text" id="address_from" placeholder="📍 Откуда (определяется автоматически)" readonly>
+    </div>
+    <div class="input-group">
+        <input type="text" id="address_to" placeholder="🏁 Куда едем?" focus>
+    </div>
+
+    <div class="price-tag">
+        <span>Ориентировочная цена:</span>
+        <span id="price">350 ₽</span>
+    </div>
+
+    <button id="order_btn">Заказать</button>
+
+    <script>
+        // 1. Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Раскрыть на весь экран
+        tg.MainButton.hide(); // Скрываем стандартную кнопку телеграм (если не используем)
+
+        // Настройка цветов под тему Телеграма
+        document.body.style.backgroundColor = tg.themeParams.bg_color;
+        document.querySelector('button').style.backgroundColor = tg.themeParams.button_color || '#3b82f6';
+        document.querySelector('button').style.color = tg.themeParams.button_text_color || '#ffffff';
+
+        // 2. Инициализация Карты (Москва по умолчанию)
+        var map = L.map('map').setView([55.7558, 37.6173], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        // Маркер пользователя
+        var userMarker = L.marker([55.7558, 37.6173]).addTo(map).bindPopup("Вы здесь");
+
+        // Определение геолокации
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                map.setView([lat, lon], 15);
+                userMarker.setLatLng([lat, lon]);
+                document.getElementById('address_from').value = "Мое местоположение";
+            }, () => {
+                document.getElementById('address_from').value = "Не удалось определить";
+            });
+        }
+
+        // 3. Логика заказа
+        const orderBtn = document.getElementById("order_btn");
+        orderBtn.addEventListener('click', () => {
+            const to = document.getElementById('address_to').value;
+            const user = tg.initDataUnsafe.user; // Данные пользователя
+
+            if (!to) {
+                tg.showAlert("Пожалуйста, укажите куда ехать!");
+                return;
+            }
+
+            // Показываем статус "Загрузка" на кнопке
+            orderBtn.innerText = "Поиск машины...";
+            orderBtn.disabled = true;
+
+            // Имитация отправки на сервер
+            // В реальности здесь будет fetch('https://ваш-бэкенд.com/order', ...)
+            setTimeout(() => {
+                tg.showPopup({
+                    title: "🚕 Водитель найден!",
+                    message: `Ваш заказ принят. Ожидайте звонка.\n\nКуда: ${to}`,
+                    buttons: [{ type: "ok" }]
+                }, () => {
+                    // Закрываем приложение
+                    tg.close();
+                });
+            }, 2000); // Имитация поиска 2 секунды
+        });
+    </script>
+</body>
+</html>
