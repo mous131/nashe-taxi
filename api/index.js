@@ -1,18 +1,26 @@
 const { Telegraf } = require('telegraf');
 
 module.exports = async (req, res) => {
-  try {
-    const BOT_TOKEN = process.env.BOT_TOKEN;
-    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/'; // Замените ссылку!
+  // 1. Проверка метода запроса (Telegram шлет POST)
+  if (req.method !== 'POST') {
+    return res.status(200).send('Сервер работает! Но это не запрос Telegram.');
+  }
 
+  try {
+    // 2. Получаем токен
+    const BOT_TOKEN = process.env.BOT_TOKEN;
     if (!BOT_TOKEN) {
-      return res.status(500).send('Server error');
+      console.error('ОШИБКА: BOT_TOKEN не найден в настройках Vercel!');
+      return res.status(500).send('Server config error');
     }
 
-    const bot = new Telegraf(BOT_TOKEN);
-    const { body } = req;
+    // 3. Ваша ссылка на приложение (ЗАМЕНИТЕ ВАШ_НИК!)
+    const WEB_APP_URL = 'https://ВАШ_НИК.github.io/nashe-taxi/';
 
-    // 1. Обработка команды /start
+    const bot = new Telegraf(BOT_TOKEN);
+    const body = req.body;
+
+    // 4. Обработка команды /start
     if (body && body.message && body.message.text === '/start') {
       const chatId = body.message.chat.id;
       const firstName = body.message.from.first_name;
@@ -20,8 +28,7 @@ module.exports = async (req, res) => {
       await bot.telegram.sendMessage(chatId, 
         `👋 *Привет, ${firstName}!*\n\n` +
         `Добро пожаловать в «Наше Такси».\n` +
-        `Нажмите кнопку ниже, чтобы вызвать машину.\n\n` +
-        `🚕 *Быстро. Надежно. По-свойски.*`, 
+        `Нажмите кнопку ниже, чтобы вызвать машину.`, 
         {
           parse_mode: 'Markdown',
           reply_markup: {
@@ -34,33 +41,17 @@ module.exports = async (req, res) => {
       return res.status(200).send('OK');
     }
 
-    // 2. Обработка ЗАКАЗА (из приложения)
-    if (body && body.user && body.to) {
-        const userName = body.user.first_name;
+    // 5. Обработка Заказа (из приложения)
+    if (body && body.to) {
+        const userName = body.user ? body.user.first_name : 'Гость';
         console.log(`🚕 НОВЫЙ ЗАКАЗ от ${userName} -> ${body.to}`);
-        // Тут можно добавить логику уведомления водителя
-        
         return res.status(200).json({ ok: true, message: "Заказ принят" });
     }
 
     res.status(200).send('OK');
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).send('Error');
-  }
-};
-  }
-};
-// --- Новый код для приема заказов ---
-if (body && body.type === 'order') {
-    const userName = body.user.first_name;
-    const userId = body.user.id;
-    const destination = body.to;
 
-    // Здесь можно отправить админу уведомление или записать в базу
-    console.log(`НОВЫЙ ЗАКАЗ от ${userName}: едет в ${destination}`);
-    
-    // Отвечаем приложению, что всё ок
-    res.status(200).json({ ok: true, message: "Заказ принят" });
-    return; // Завершаем выполнение
-}
+  } catch (error) {
+    console.error('Критическая ошибка:', error);
+    res.status(500).send('Internal Error');
+  }
+};
