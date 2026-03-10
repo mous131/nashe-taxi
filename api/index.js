@@ -37,3 +37,16 @@ module.exports = async (req, res) => {
     res.status(500).send('Error');
   }
 };
+// --- Новый код для приема заказов ---
+if (body && body.type === 'order') {
+    const userName = body.user.first_name;
+    const userId = body.user.id;
+    const destination = body.to;
+
+    // Здесь можно отправить админу уведомление или записать в базу
+    console.log(`НОВЫЙ ЗАКАЗ от ${userName}: едет в ${destination}`);
+    
+    // Отвечаем приложению, что всё ок
+    res.status(200).json({ ok: true, message: "Заказ принят" });
+    return; // Завершаем выполнение
+}
