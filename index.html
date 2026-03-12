@@ -30,7 +30,11 @@
         }
     </script>
     <style>
-        body { background-color: var(--tg-theme-bg-color, #FAF8F5); color: var(--tg-theme-text-color, #2A2622); }
+        /* FIX: Жестко задаем светлый фон, игнорируя тему Telegram */
+        body {
+            background-color: #FAF8F5 !important;
+            color: #2A2622 !important;
+        }
         
         .glass-panel {
             background: rgba(255, 255, 255, 0.85);
@@ -38,7 +42,7 @@
             border: 1px solid rgba(255, 255, 255, 0.6);
         }
         .glass-nav {
-            background: rgba(250, 248, 245, 0.9);
+            background: rgba(250, 248, 245, 0.95);
             backdrop-filter: blur(16px);
         }
         @keyframes fadeUp {
@@ -57,12 +61,6 @@
         .leaflet-tile-pane { filter: grayscale(40%) sepia(30%) hue-rotate(70deg) saturate(150%) brightness(0.95); }
         .leaflet-control-zoom { display: none; }
         .leaflet-routing-container { display: none !important; }
-        
-        /* Markers */
-        @keyframes pulse-marker {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(125, 148, 104, 0.5); }
-            50% { box-shadow: 0 0 0 15px rgba(125, 148, 104, 0); }
-        }
     </style>
 </head>
 <body class="font-sans antialiased">
@@ -86,7 +84,7 @@
     </nav>
 
     <!-- Main Content -->
-    <section class="min-h-screen pt-20 relative">
+    <section class="min-h-screen pt-20 relative pb-24">
         <div class="max-w-7xl mx-auto px-6 lg:px-16 py-8">
             <div class="grid lg:grid-cols-2 gap-8 items-start">
                 
@@ -156,7 +154,7 @@
                         </p>
                     </div>
 
-                    <!-- Stats Block (New) -->
+                    <!-- Stats Block -->
                     <div class="opacity-0 animate-fade-up delay-200">
                         <div class="bg-white rounded-[2rem] p-5 shadow-xl shadow-warm-900/5 border border-warm-400/10">
                             <div class="grid grid-cols-4 gap-4 text-center">
@@ -245,7 +243,7 @@
         tg.MainButton.show();
 
         // ========== SETTINGS ==========
-        const PRICE_PER_KM = 100; // Фиксированная цена
+        const PRICE_PER_KM = 100; 
         const MOSCOW_CENTER = [55.7558, 37.6173];
         
         // ========== VARIABLES ==========
@@ -297,7 +295,7 @@
             document.getElementById('selecting-label').innerText = selectingPoint === 'from' ? 'отправление' : 'прибытие';
         }
         
-        async function buildRoute() {
+        function buildRoute() {
             if (!fromMarker || !toMarker) return;
             
             const from = fromMarker.getLatLng();
@@ -305,7 +303,7 @@
             
             const distance = map.distance(from, to);
             const price = Math.round((distance / 1000) * PRICE_PER_KM);
-            const time = Math.round((distance / 1000) * 3); // Примерно 3 мин на км
+            const time = Math.round((distance / 1000) * 3); 
             
             if (routeLine) map.removeLayer(routeLine);
             routeLine = L.polyline([from, to], { color: '#7D9468', weight: 4, dashArray: '10, 10' }).addTo(map);
@@ -367,7 +365,6 @@
 
             tg.MainButton.showProgress();
             
-            // Анимация обновления статистики
             updateStats();
 
             setTimeout(() => {
