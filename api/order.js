@@ -1,23 +1,24 @@
 const { Telegraf } = require('telegraf');
 
 module.exports = async (req, res) => {
-    if (req.method !== 'POST') return res.status(200).send('OK');
+    // 1. Разрешаем только POST запросы
+    if (req.method !== 'POST') {
+        return res.status(200).send('OK');
+    }
 
     try {
         const data = req.body;
         const { user, from, to, price } = data;
         
-        // 1. ID куда слать (Ваши ID)
+        // 2. Настройки (Ваши данные)
         const DRIVER_ID = '993037802';
         const ADMIN_ID = '993037802';
-
-        // 2. Токены ботов
+        
+        // Токены
         const DRIVER_TOKEN = '8640774352:AAHiHJbjctBaJwcxJFfK16mjChHpxfpMZHw';
         const ADMIN_TOKEN = '8672148337:AAEmIFVKJNDo5gJUNzcwGBBXJbalN_8voQ0';
-        
-        // Токен клиентского бота (чтобы слать сообщение клиенту "Водитель едет")
-        // Он должен быть в настройках Vercel, но если нет - вставьте сюда вручную
-        const CLIENT_TOKEN = process.env.BOT_TOKEN; 
+        // ВСТАВЬТЕ СЮДА ТОКЕН ВАШЕГО КЛИЕНТСКОГО БОТА (который в BotFather самый первый):
+        const CLIENT_TOKEN = process.env.BOT_TOKEN || 'ТОКЕН_КЛИЕНТСКОГО_БОТА'; 
 
         const driverBot = new Telegraf(DRIVER_TOKEN);
         const adminBot = new Telegraf(ADMIN_TOKEN);
@@ -49,7 +50,7 @@ module.exports = async (req, res) => {
             }
         });
 
-        // 4. Отправляем Админу (лог)
+        // 4. Отправляем Админу
         await adminBot.telegram.sendMessage(ADMIN_ID, message + `\n🔔 Статус: Поиск водителя`, {
             parse_mode: 'HTML'
         });
