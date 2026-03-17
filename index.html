@@ -4,21 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Наше Такси</title>
+    
+    <!-- Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
-    <!-- БЕСПЛАТНАЯ КАРТА (БЕЗ КЛЮЧЕЙ) -->
+    <!-- Карта (Leaflet) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- Стили -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
     
+    <!-- КОНФИГУРАЦИЯ ЦВЕТОВ (Это я забыл в прошлом разе) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        beige: { 50: '#FAF8F5', 100: '#F5F0E8' },
+                        sage: { 500: '#7D9468', 600: '#5C7A4A' },
+                        warm: { 400: '#A69E94', 500: '#8B8279', 600: '#6B635A', 700: '#4A443E', 800: '#3A352F', 900: '#2A2622' }
+                    },
+                    fontFamily: { serif: ['Playfair Display', 'serif'] }
+                }
+            }
+        }
+    </script>
+    
     <style>
         body { background-color: #FAF8F5 !important; color: #2A2622 !important; }
         .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.6); }
-        .user-marker { width: 16px; height: 16px; background: #5C7A4A; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); animation: pulse 2s infinite; }
+        
+        /* Анимация маркера */
+        .user-marker {
+            width: 16px; height: 16px; background: #5C7A4A; border: 3px solid white;
+            border-radius: 50%; box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); 
+            animation: pulse 2s infinite;
+        }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(92, 122, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0); } }
+        
+        /* Скрываем копирайт Leaflet */
+        .leaflet-control-attribution { display: none; }
     </style>
 </head>
 <body class="font-sans antialiased">
@@ -27,12 +55,12 @@
     <nav class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-warm-400/10">
         <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-[#5C7A4A] rounded-lg flex items-center justify-center">
+                <div class="w-8 h-8 bg-sage-600 rounded-lg flex items-center justify-center">
                     <iconify-icon icon="lucide:car" class="text-white"></iconify-icon>
                 </div>
-                <span class="font-serif text-lg font-medium text-[#2A2622]">Наше Такси</span>
+                <span class="font-serif text-lg font-medium text-warm-900">Наше Такси</span>
             </div>
-            <div class="text-xs font-medium text-[#5C7A4A] bg-[#7D9468]/10 px-2 py-1 rounded-full">Онлайн</div>
+            <div class="text-xs font-medium text-sage-600 bg-sage-500/10 px-2 py-1 rounded-full">Онлайн</div>
         </div>
     </nav>
 
@@ -42,61 +70,58 @@
         <div class="flex-1 relative">
             <div id="map" style="height: 100%; width: 100%; position: absolute; top:0; left:0; z-index: 1;"></div>
             
-            <!-- Кнопки на карте -->
+            <!-- Кнопки поверх карты -->
             <div class="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-                <button onclick="locateUser()" class="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-[#5C7A4A] hover:scale-105 transition-transform">
+                <button onclick="locateUser()" class="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-sage-600 hover:text-sage-800 transition-colors">
                     <iconify-icon icon="lucide:locate" class="text-xl"></iconify-icon>
                 </button>
-            </div>
-            <div class="absolute top-4 left-4 z-[1000] glass-panel rounded-xl px-3 py-1.5 text-xs text-[#2A2622]">
-                Тапните карту, чтобы выбрать <strong>куда</strong>
             </div>
         </div>
 
         <!-- Нижняя панель -->
-        <div class="relative z-[1001] bg-[#FAF8F5] rounded-t-[2rem] shadow-2xl flex flex-col" style="max-height: 55vh;">
+        <div class="relative z-[1001] bg-beige-50 rounded-t-[2rem] shadow-2xl border-t border-warm-400/10 flex flex-col" style="max-height: 55vh;">
             
             <!-- Статистика -->
-            <div class="p-3 border-b border-gray-100 bg-white/50 rounded-t-[2rem]">
+            <div class="p-3 border-b border-warm-400/10 bg-white/50 rounded-t-[2rem]">
                 <div class="grid grid-cols-4 gap-2 text-center">
-                    <div><p class="text-lg font-serif font-bold text-[#2A2622]">14</p><p class="text-[10px] text-gray-400">Машин</p></div>
-                    <div><p class="text-lg font-serif font-bold text-[#2A2622]">1 204</p><p class="text-[10px] text-gray-400">Заказов</p></div>
-                    <div><p class="text-lg font-serif font-bold text-[#2A2622]">1 180</p><p class="text-[10px] text-gray-400">Поездок</p></div>
-                    <div><p class="text-lg font-serif font-bold text-[#2A2622]">8.5k</p><p class="text-[10px] text-gray-400">Км</p></div>
+                    <div><p class="text-lg font-serif font-bold text-warm-800">14</p><p class="text-[10px] text-warm-400">Машин</p></div>
+                    <div><p class="text-lg font-serif font-bold text-warm-800">1 204</p><p class="text-[10px] text-warm-400">Заказов</p></div>
+                    <div><p class="text-lg font-serif font-bold text-warm-800">1 180</p><p class="text-[10px] text-warm-400">Поездок</p></div>
+                    <div><p class="text-lg font-serif font-bold text-warm-800">8.5k</p><p class="text-[10px] text-warm-400">Км</p></div>
                 </div>
             </div>
 
             <div class="p-4 overflow-y-auto">
                 <!-- Поля ввода -->
                 <div class="space-y-3 mb-4">
-                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                        <div class="w-2.5 h-2.5 bg-[#5C7A4A] rounded-full"></div>
-                        <input type="text" id="from-address" placeholder="Откуда (определяется...)" class="w-full bg-transparent text-sm text-[#2A2622] placeholder:text-gray-300 outline-none" readonly>
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
+                        <div class="w-2.5 h-2.5 bg-sage-600 rounded-full"></div>
+                        <input type="text" id="from-address" placeholder="Откуда (определяется...)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
                     </div>
                     
-                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
                         <div class="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                        <input type="text" id="to-address" placeholder="Куда едем?" class="w-full bg-transparent text-sm text-[#2A2622] placeholder:text-gray-300 outline-none" readonly>
-                        <button onclick="clearRoute()" class="text-gray-300 hover:text-red-400 p-1">
+                        <input type="text" id="to-address" placeholder="Куда едем? (нажмите карту)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
+                        <button onclick="clearRoute()" class="text-warm-300 hover:text-red-400 p-1">
                             <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
                         </button>
                     </div>
                 </div>
 
                 <!-- Цена -->
-                <div id="route-info" class="hidden bg-[#7D9468]/10 rounded-xl p-3 mb-4 flex justify-between items-center border border-[#7D9468]/20">
+                <div id="route-info" class="hidden bg-sage-50 rounded-xl p-3 mb-4 flex justify-between items-center border border-sage-100">
                     <div>
-                        <p class="text-xs text-gray-500">Стоимость</p>
-                        <p class="text-xl font-serif font-bold text-[#5C7A4A]" id="route-price">0 ₽</p>
+                        <p class="text-xs text-warm-400">Стоимость</p>
+                        <p class="text-xl font-serif font-bold text-sage-600" id="route-price">0 ₽</p>
                     </div>
                     <div class="text-right">
-                        <p class="text-xs text-gray-500">Расстояние</p>
-                        <p class="text-sm font-medium text-[#2A2622]" id="route-distance">0 км</p>
+                        <p class="text-xs text-warm-400">Расстояние</p>
+                        <p class="text-sm font-medium text-warm-700" id="route-distance">0 км</p>
                     </div>
                 </div>
                 
                 <!-- Кнопка заказа -->
-                <button onclick="submitOrder()" id="order-btn" class="w-full bg-[#5C7A4A] text-white py-3 rounded-xl font-medium hover:bg-[#4A6239] transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.99]">
+                <button onclick="submitOrder()" id="order-btn" class="w-full bg-sage-600 text-white py-3 rounded-xl font-medium hover:bg-sage-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.99]">
                     <span>Заказать такси</span>
                 </button>
             </div>
@@ -114,7 +139,7 @@
         
         const PRICE_PER_KM = 100;
 
-        // Инициализация карты
+        // 1. Инициализация карты
         document.addEventListener('DOMContentLoaded', () => {
             map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
@@ -122,7 +147,9 @@
             locateUser();
         });
 
+        // 2. Геолокация
         function locateUser() {
+            if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const lat = pos.coords.latitude;
@@ -136,10 +163,11 @@
                     
                     document.getElementById('from-address').value = "Я здесь";
                 },
-                (err) => console.log(err)
+                (err) => { console.log(err); }
             );
         }
 
+        // 3. Клик по карте
         function onMapClick(e) {
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
@@ -152,10 +180,11 @@
                 })
             }).addTo(map);
             
-            document.getElementById('to-address').value = "Точка на карте";
+            document.getElementById('to-address').value = "Точка назначения";
             calculateRoute();
         }
 
+        // 4. Расчет маршрута
         function calculateRoute() {
             if (!fromMarker || !toMarker) return;
             
@@ -181,6 +210,7 @@
             document.getElementById('route-info').classList.add('hidden');
         }
 
+        // 5. Отправка заказа
         function submitOrder() {
             const btn = document.getElementById('order-btn');
             const from = document.getElementById('from-address').value;
@@ -213,7 +243,7 @@
             .catch(e => {
                 btn.disabled = false;
                 btn.innerHTML = "Заказать такси";
-                tg.showAlert("Ошибка соединения. Проверьте интернет.");
+                tg.showAlert("Ошибка соединения.");
             });
         }
     </script>
