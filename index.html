@@ -2,27 +2,26 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Наше Такси</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     
-    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        beige: { 50: '#FAF8F5', 100: '#F5F0E8', 200: '#E8E0D5', 300: '#D4C9BA' },
-                        sage: { 400: '#9CAF88', 500: '#7D9468', 600: '#5C7A4A', 700: '#4A6239' },
-                        warm: { 400: '#A69E94', 500: '#8B8279', 600: '#6B635A', 700: '#4A443E', 800: '#3A352F', 900: '#2A2622' }
+                        beige: { 50: '#FAF8F5', 100: '#F5F0E8' },
+                        sage: { 500: '#7D9468', 600: '#5C7A4A' },
+                        warm: { 400: '#A69E94', 800: '#3A352F', 900: '#2A2622' }
                     },
                     fontFamily: { serif: ['Playfair Display', 'serif'], sans: ['Geist', 'sans-serif'] }
                 }
@@ -30,271 +29,223 @@
         }
     </script>
     <style>
-        /* FIX: Жестко задаем светлый фон, игнорируя тему Telegram */
-        body {
-            background-color: #FAF8F5 !important;
-            color: #2A2622 !important;
-        }
-        
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-        }
-        .glass-nav {
-            background: rgba(250, 248, 245, 0.95);
-            backdrop-filter: blur(16px);
-        }
-        @keyframes fadeUp {
-            0% { opacity: 0; transform: translateY(30px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-up { animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        body { background-color: #FAF8F5 !important; color: #2A2622 !important; }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.6); }
+        .glass-nav { background: rgba(250, 248, 245, 0.95); backdrop-filter: blur(16px); }
+        @keyframes fadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+        .animate-fade-up { animation: fadeUp 0.8s ease forwards; }
         .delay-100 { animation-delay: 0.1s; }
         .delay-200 { animation-delay: 0.2s; }
-        .delay-300 { animation-delay: 0.3s; }
-        .delay-400 { animation-delay: 0.4s; }
         
-        input:focus { outline: none; border-color: #7D9468; }
-        
-        /* Map Styling */
-        .leaflet-tile-pane { filter: grayscale(40%) sepia(30%) hue-rotate(70deg) saturate(150%) brightness(0.95); }
+        .leaflet-tile-pane { filter: grayscale(30%) sepia(20%) hue-rotate(70deg) saturate(150%); }
         .leaflet-control-zoom { display: none; }
-        .leaflet-routing-container { display: none !important; }
+        
+        /* Пульсирующий маркер геолокации */
+        .user-location-marker {
+            width: 16px; height: 16px;
+            background: #5C7A4A;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7);
+            animation: pulse-loc 2s infinite;
+        }
+        @keyframes pulse-loc {
+            0% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(92, 122, 74, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0); }
+        }
     </style>
 </head>
 <body class="font-sans antialiased">
     
     <!-- Navigation -->
     <nav class="fixed top-0 left-0 right-0 z-50 glass-nav border-b border-warm-400/10">
-        <div class="max-w-7xl mx-auto px-6 lg:px-16">
-            <div class="flex items-center justify-between h-16">
-                <a href="#" class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-sage-600 rounded-lg flex items-center justify-center">
-                        <iconify-icon icon="lucide:car" class="text-white text-lg"></iconify-icon>
-                    </div>
-                    <span class="font-serif text-xl font-medium text-warm-900">Наше Такси</span>
-                </a>
-                <div class="flex items-center gap-2 text-xs font-medium text-warm-600 bg-sage-50 px-3 py-1.5 rounded-full">
-                    <iconify-icon icon="lucide:signal" class="text-green-600"></iconify-icon>
-                    Сервис работает
+        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-sage-600 rounded-lg flex items-center justify-center">
+                    <iconify-icon icon="lucide:car" class="text-white"></iconify-icon>
                 </div>
+                <span class="font-serif text-lg font-medium text-warm-900">Наше Такси</span>
+            </div>
+            <div class="text-xs font-medium text-sage-600 bg-sage-500/10 px-2 py-1 rounded-full flex items-center gap-1">
+                <span class="w-1.5 h-1.5 bg-sage-600 rounded-full animate-pulse"></span> Онлайн
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <section class="min-h-screen pt-20 relative pb-24">
-        <div class="max-w-7xl mx-auto px-6 lg:px-16 py-8">
-            <div class="grid lg:grid-cols-2 gap-8 items-start">
-                
-                <!-- Left: Booking Form -->
-                <div class="relative z-10 space-y-6">
-                    
-                    <!-- Header -->
-                    <div class="opacity-0 animate-fade-up">
-                        <h1 class="font-serif text-3xl lg:text-4xl font-medium leading-tight tracking-tight text-warm-900 mb-2">
-                            Куда едем сегодня?
-                        </h1>
-                        <p class="text-warm-500 text-sm">
-                            Выберите точки на карте. Цена рассчитается автоматически.
-                        </p>
-                    </div>
-                    
-                    <!-- Form -->
-                    <div class="opacity-0 animate-fade-up delay-100 bg-white rounded-[2rem] p-6 shadow-xl shadow-warm-900/5 border border-warm-400/10">
-                        
-                        <!-- Address Inputs -->
-                        <div class="space-y-3 mb-6">
-                            <!-- From -->
-                            <div class="flex items-center gap-3 p-3 bg-beige-50 rounded-xl border border-warm-100 focus-within:border-sage-400 transition-all">
-                                <div class="w-8 h-8 bg-sage-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <div class="w-2.5 h-2.5 bg-sage-500 rounded-full"></div>
-                                </div>
-                                <input type="text" id="from-address" placeholder="Откуда (кликните на карте)" class="w-full bg-transparent text-warm-800 placeholder:text-warm-400 text-sm">
-                                <button onclick="useGeolocation()" class="p-1.5 text-warm-400 hover:text-sage-600 transition-colors">
-                                    <iconify-icon icon="lucide:locate" class="text-lg"></iconify-icon>
-                                </button>
-                            </div>
-                            
-                            <!-- To -->
-                            <div class="flex items-center gap-3 p-3 bg-beige-50 rounded-xl border border-warm-100 focus-within:border-sage-400 transition-all">
-                                <div class="w-8 h-8 bg-sage-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <iconify-icon icon="lucide:navigation" class="text-white text-sm rotate-90"></iconify-icon>
-                                </div>
-                                <input type="text" id="to-address" placeholder="Куда едем?" class="w-full bg-transparent text-warm-800 placeholder:text-warm-400 text-sm">
-                                <button onclick="clearRoute()" class="p-1.5 text-warm-400 hover:text-red-500 transition-colors">
-                                    <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Route Info -->
-                        <div id="route-info" class="hidden mb-4 bg-sage-50 rounded-xl p-4 border border-sage-100">
-                            <div class="flex justify-between items-center">
-                                <div class="text-center">
-                                    <p class="text-xs text-warm-400 uppercase tracking-wider mb-1">Расстояние</p>
-                                    <p class="text-xl font-serif font-medium text-warm-800" id="route-distance">— км</p>
-                                </div>
-                                <div class="w-px h-10 bg-warm-200"></div>
-                                <div class="text-center">
-                                    <p class="text-xs text-warm-400 uppercase tracking-wider mb-1">Время</p>
-                                    <p class="text-xl font-serif font-medium text-warm-800" id="route-time">— мин</p>
-                                </div>
-                                <div class="w-px h-10 bg-warm-200"></div>
-                                <div class="text-center">
-                                    <p class="text-xs text-warm-400 uppercase tracking-wider mb-1">Стоимость</p>
-                                    <p class="text-xl font-serif font-medium text-sage-600" id="route-price">— ₽</p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <p class="text-center text-xs text-warm-300 mt-2">
-                            Фиксированный тариф: 100 ₽/км
-                        </p>
-                    </div>
+    <!-- Main Layout -->
+    <section class="pt-16 min-h-screen flex flex-col">
+        <div class="flex-1 relative">
+             <!-- Map Container -->
+            <div id="map" style="height: 100%; width: 100%; position: absolute; top:0; left:0; z-index: 1;"></div>
+            
+            <!-- Map UI Overlay -->
+            <div class="absolute top-4 left-4 right-4 z-[1000] flex justify-between items-start pointer-events-none">
+                <div class="glass-panel rounded-xl px-3 py-1.5 text-xs text-warm-600 pointer-events-auto">
+                    Тапните карту, чтобы выбрать <strong id="selecting-label">куда</strong>
+                </div>
+                <div class="flex flex-col gap-2 pointer-events-auto">
+                    <button onclick="zoomIn()" class="w-9 h-9 bg-white rounded-xl shadow-lg flex items-center justify-center text-warm-600 hover:text-sage-600 text-xl font-light">+</button>
+                    <button onclick="zoomOut()" class="w-9 h-9 bg-white rounded-xl shadow-lg flex items-center justify-center text-warm-600 hover:text-sage-600 text-xl font-light">−</button>
+                    <button onclick="locateUser()" class="w-9 h-9 bg-white rounded-xl shadow-lg flex items-center justify-center text-sage-600 hover:text-sage-800 transition-colors">
+                        <iconify-icon icon="lucide:locate" class="text-lg"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+        </div>
 
-                    <!-- Stats Block -->
-                    <div class="opacity-0 animate-fade-up delay-200">
-                        <div class="bg-white rounded-[2rem] p-5 shadow-xl shadow-warm-900/5 border border-warm-400/10">
-                            <div class="grid grid-cols-4 gap-4 text-center">
-                                <div>
-                                    <div class="w-10 h-10 mx-auto bg-sage-50 rounded-xl flex items-center justify-center mb-2">
-                                        <iconify-icon icon="lucide:users" class="text-xl text-sage-600"></iconify-icon>
-                                    </div>
-                                    <p class="text-2xl font-serif font-bold text-warm-800" id="stat-drivers">14</p>
-                                    <p class="text-xs text-warm-400">Водителей</p>
-                                </div>
-                                <div>
-                                    <div class="w-10 h-10 mx-auto bg-sage-50 rounded-xl flex items-center justify-center mb-2">
-                                        <iconify-icon icon="lucide:receipt" class="text-xl text-sage-600"></iconify-icon>
-                                    </div>
-                                    <p class="text-2xl font-serif font-bold text-warm-800" id="stat-orders">1 204</p>
-                                    <p class="text-xs text-warm-400">Заказов</p>
-                                </div>
-                                <div>
-                                    <div class="w-10 h-10 mx-auto bg-sage-50 rounded-xl flex items-center justify-center mb-2">
-                                        <iconify-icon icon="lucide:route" class="text-xl text-sage-600"></iconify-icon>
-                                    </div>
-                                    <p class="text-2xl font-serif font-bold text-warm-800" id="stat-routes">1 180</p>
-                                    <p class="text-xs text-warm-400">Маршрутов</p>
-                                </div>
-                                <div>
-                                    <div class="w-10 h-10 mx-auto bg-sage-50 rounded-xl flex items-center justify-center mb-2">
-                                        <iconify-icon icon="lucide:map-pin" class="text-xl text-sage-600"></iconify-icon>
-                                    </div>
-                                    <p class="text-2xl font-serif font-bold text-warm-800" id="stat-km">8.5k</p>
-                                    <p class="text-xs text-warm-400">Километров</p>
-                                </div>
-                            </div>
-                        </div>
+        <!-- Bottom Sheet -->
+        <div class="relative z-[1001] bg-beige-50 rounded-t-[2rem] shadow-2xl border-t border-warm-400/10 flex flex-col" style="max-height: 60vh;">
+            
+            <!-- Stats Bar -->
+            <div class="p-3 border-b border-warm-400/10 bg-white/50 rounded-t-[2rem]">
+                <div class="grid grid-cols-4 gap-2 text-center">
+                    <div>
+                        <p class="text-lg font-serif font-bold text-warm-800" id="stat-drivers">14</p>
+                        <p class="text-[10px] text-warm-400">Машин</p>
+                    </div>
+                    <div>
+                        <p class="text-lg font-serif font-bold text-warm-800" id="stat-orders">1 204</p>
+                        <p class="text-[10px] text-warm-400">Заказов</p>
+                    </div>
+                    <div>
+                        <p class="text-lg font-serif font-bold text-warm-800" id="stat-routes">1 180</p>
+                        <p class="text-[10px] text-warm-400">Поездок</p>
+                    </div>
+                    <div>
+                        <p class="text-lg font-serif font-bold text-warm-800" id="stat-km">8.5k</p>
+                        <p class="text-[10px] text-warm-400">Километров</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 overflow-y-auto">
+                <!-- Inputs -->
+                <div class="space-y-3 mb-4">
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
+                        <div class="w-2.5 h-2.5 bg-sage-500 rounded-full"></div>
+                        <input type="text" id="from-address" placeholder="Откуда (определяется...)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-300 outline-none">
+                    </div>
+                    
+                    <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
+                        <div class="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                        <input type="text" id="to-address" placeholder="Куда едем?" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-300 outline-none">
+                        <button onclick="clearRoute()" class="text-warm-300 hover:text-red-400 p-1">
+                            <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Price Info -->
+                <div id="route-info" class="hidden bg-sage-50 rounded-xl p-3 mb-4 flex justify-between items-center border border-sage-100">
+                    <div>
+                        <p class="text-xs text-warm-400">Приблизительная стоимость</p>
+                        <p class="text-xl font-serif font-bold text-sage-600" id="route-price">0 ₽</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-warm-400">Расстояние</p>
+                        <p class="text-sm font-medium text-warm-700" id="route-distance">0 км</p>
                     </div>
                 </div>
                 
-                <!-- Right: Interactive Map -->
-                <div class="opacity-0 animate-fade-up delay-300 lg:sticky lg:top-24">
-                    <div class="bg-white rounded-[2rem] p-3 shadow-xl shadow-warm-900/5 border border-warm-400/10">
-                        <div class="rounded-[1.5rem] overflow-hidden relative" style="height: 450px;">
-                            <!-- Map -->
-                            <div id="map" style="width: 100%; height: 100%; border-radius: 1.5rem;"></div>
-                            
-                            <!-- Map Controls -->
-                            <div class="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
-                                <button onclick="zoomIn()" class="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-warm-600 hover:text-sage-600 transition-all">+</button>
-                                <button onclick="zoomOut()" class="w-10 h-10 bg-white rounded-xl shadow-lg flex items-center justify-center text-warm-600 hover:text-sage-600 transition-all">−</button>
-                            </div>
-                            
-                            <!-- Hint -->
-                            <div class="absolute top-4 left-4 z-[1000]">
-                                <div class="glass-panel rounded-xl px-4 py-2 flex items-center gap-2">
-                                    <div class="w-2 h-2 bg-sage-500 rounded-full animate-pulse"></div>
-                                    <span class="text-xs text-warm-600">Выберите <strong id="selecting-label">отправление</strong></span>
-                                </div>
-                            </div>
-                            
-                            <!-- Drivers Info -->
-                            <div class="absolute bottom-4 left-4 right-4 z-[1000]">
-                                <div class="glass-panel rounded-xl px-4 py-3 flex items-center justify-between">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-8 h-8 bg-sage-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                                            A
-                                        </div>
-                                        <div>
-                                            <p class="text-sm font-medium text-warm-800">14 машин онлайн</p>
-                                            <p class="text-xs text-warm-400">Подача ~4 минуты</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <p class="text-[10px] text-warm-300 text-center">Тариф: 100 ₽/км • Нажмите на карту для выбора точки</p>
             </div>
         </div>
     </section>
 
-    <!-- JavaScript -->
     <script>
-        // ========== TELEGRAM INIT ==========
         const tg = window.Telegram.WebApp;
-        tg.expand(); 
-        
-        tg.MainButton.setText("🚕 Вызвать такси");
-        tg.MainButton.show();
+        tg.expand();
+        tg.MainButton.setText("🚕 Вызвать такси").show();
 
-        // ========== SETTINGS ==========
-        const PRICE_PER_KM = 100; 
-        const MOSCOW_CENTER = [55.7558, 37.6173];
-        
-        // ========== VARIABLES ==========
         let map;
-        let fromMarker = null;
-        let toMarker = null;
+        let userMarker = null; // Синий маркер пользователя
+        let fromMarker = null; // Зеленый маркер
+        let toMarker = null;   // Красный маркер
         let routeLine = null;
-        let selectingPoint = 'from';
-        
-        // ========== INIT ==========
-        document.addEventListener('DOMContentLoaded', function() {
-            initMap();
-        });
-        
+        let userCoords = null;
+
+        const PRICE_PER_KM = 100;
+
+        document.addEventListener('DOMContentLoaded', initMap);
+
         function initMap() {
-            map = L.map('map', { center: MOSCOW_CENTER, zoom: 13, zoomControl: false });
+            // 1. Инициализация карты (Москва по умолчанию)
+            map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
+            
+            // Клик по карте = установка точки "Куда"
             map.on('click', onMapClick);
-            addDemoDrivers();
+
+            // 2. Пробуем найти пользователя сразу
+            locateUser();
         }
-        
-        function onMapClick(e) {
-            const { lat, lng } = e.latlng;
-            if (selectingPoint === 'from') {
-                setPoint(lat, lng, 'from');
-                selectingPoint = 'to';
-            } else {
-                setPoint(lat, lng, 'to');
-                selectingPoint = 'from';
+
+        // Функция геолокации
+        function locateUser() {
+            if (!navigator.geolocation) {
+                tg.showAlert("Геолокация не поддерживается");
+                return;
             }
-            updateLabel();
+
+            // Показываем загрузку в поле ввода
+            document.getElementById('from-address').placeholder = "Определяем место...";
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const { latitude, longitude } = pos.coords;
+                    userCoords = { lat: latitude, lon: longitude };
+                    
+                    // Летим к пользователю
+                    map.setView([latitude, longitude], 16);
+
+                    // Ставим красивый маркер "Вы здесь"
+                    if (userMarker) map.removeLayer(userMarker);
+                    userMarker = L.marker([latitude, longitude], {
+                        icon: L.divIcon({
+                            className: 'user-location-marker',
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8]
+                        })
+                    }).addTo(map);
+
+                    // Автоматически ставим точку "Откуда"
+                    setPoint(latitude, longitude, 'from');
+                },
+                (err) => {
+                    console.error(err);
+                    document.getElementById('from-address').placeholder = "Не удалось определить. Выберите на карте.";
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        function onMapClick(e) {
+            setPoint(e.latlng.lat, e.latlng.lng, 'to');
             buildRoute();
         }
-        
+
         function setPoint(lat, lng, type) {
-            const marker = L.marker([lat, lng]).addTo(map);
-            if (type === 'from') {
+            const isFrom = type === 'from';
+            const color = isFrom ? '#5C7A4A' : '#ef4444';
+            const iconHtml = `<div style="width:20px;height:20px;background:${color};border:3px solid white;border-radius:50%;box-shadow:0 2px 5px rgba(0,0,0,0.3)"></div>`;
+            
+            const marker = L.marker([lat, lng], {
+                icon: L.divIcon({ html: iconHtml, className: '', iconSize: [20, 20], iconAnchor: [10, 10] })
+            }).addTo(map);
+
+            if (isFrom) {
                 if (fromMarker) map.removeLayer(fromMarker);
                 fromMarker = marker;
-                document.getElementById('from-address').value = "Точка отправления";
+                document.getElementById('from-address').value = "Я здесь";
             } else {
                 if (toMarker) map.removeLayer(toMarker);
                 toMarker = marker;
                 document.getElementById('to-address').value = "Точка назначения";
+                document.getElementById('selecting-label').innerText = "маршрут готов";
             }
         }
 
-        function updateLabel() {
-            document.getElementById('selecting-label').innerText = selectingPoint === 'from' ? 'отправление' : 'прибытие';
-        }
-        
         function buildRoute() {
             if (!fromMarker || !toMarker) return;
             
@@ -303,89 +254,71 @@
             
             const distance = map.distance(from, to);
             const price = Math.round((distance / 1000) * PRICE_PER_KM);
-            const time = Math.round((distance / 1000) * 3); 
             
             if (routeLine) map.removeLayer(routeLine);
-            routeLine = L.polyline([from, to], { color: '#7D9468', weight: 4, dashArray: '10, 10' }).addTo(map);
-            map.fitBounds([from, to], { padding: [50, 50] });
+            routeLine = L.polyline([from, to], { color: '#5C7A4A', weight: 4, dashArray: '10, 10' }).addTo(map);
+            
+            // Подгоняем карту под маршрут
+            map.fitBounds([from, to], { padding: [80, 80] });
 
+            // Обновляем UI
             document.getElementById('route-distance').textContent = (distance / 1000).toFixed(1) + ' км';
-            document.getElementById('route-time').textContent = time + ' мин';
             document.getElementById('route-price').textContent = price + ' ₽';
             document.getElementById('route-info').classList.remove('hidden');
         }
 
-        function useGeolocation() {
-            if (!navigator.geolocation) return tg.showAlert("Геолокация не поддерживается");
-            navigator.geolocation.getCurrentPosition(pos => {
-                const { latitude, longitude } = pos.coords;
-                map.setView([latitude, longitude], 15);
-                setPoint(latitude, longitude, 'from');
-                selectingPoint = 'to';
-                updateLabel();
-            });
-        }
-        
         function clearRoute() {
-            if (fromMarker) map.removeLayer(fromMarker);
             if (toMarker) map.removeLayer(toMarker);
             if (routeLine) map.removeLayer(routeLine);
-            fromMarker = null; toMarker = null; routeLine = null;
-            document.getElementById('from-address').value = '';
+            toMarker = null; routeLine = null;
             document.getElementById('to-address').value = '';
             document.getElementById('route-info').classList.add('hidden');
-            selectingPoint = 'from';
-            updateLabel();
+            document.getElementById('selecting-label').innerText = "куда";
         }
-
+        
         function zoomIn() { map.zoomIn(); }
         function zoomOut() { map.zoomOut(); }
 
-        function addDemoDrivers() {
-            const drivers = [[55.76, 37.62], [55.75, 37.60], [55.74, 37.64]];
-            drivers.forEach(coords => {
-                L.marker(coords, {
-                    icon: L.divIcon({
-                        html: `<div style="width:30px;height:30px;background:#5C7A4A;border:2px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,0.2)"><iconify-icon icon="lucide:car" style="color:white;font-size:14px"></iconify-icon></div>`,
-                        className: '', iconSize: [30, 30], iconAnchor: [15, 15]
-                    })
-                }).addTo(map);
-            });
-        }
-        
-        // ========== TELEGRAM BUTTON LOGIC ==========
+        // Логика заказа
         tg.MainButton.onClick(() => {
             const from = document.getElementById('from-address').value;
             const to = document.getElementById('to-address').value;
             
             if (!from || !to) {
-                tg.showAlert("Выберите маршрут на карте!");
+                tg.showAlert("Выберите куда ехать на карте!");
                 return;
             }
 
             tg.MainButton.showProgress();
             
-            updateStats();
+            // Обновляем статистику (визуально)
+            const o = document.getElementById('stat-orders'); 
+            o.textContent = (parseInt(o.textContent.replace(/\s/g, '')) + 1).toLocaleString();
 
-            setTimeout(() => {
+            // Отправляем данные на сервер
+            fetch('https://nashe-taxi.vercel.app/api/order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user: tg.initDataUnsafe.user,
+                    from: from,
+                    to: to,
+                    price: document.getElementById('route-price').textContent
+                })
+            })
+            .then(() => {
                 tg.MainButton.hideProgress();
                 tg.showPopup({
                     title: "✅ Заказ принят",
-                    message: `Ожидайте машину!\nСтоимость: ${document.getElementById('route-price').textContent}`,
+                    message: "Ищем водителей...",
                     buttons: [{type: "ok"}]
                 }, () => tg.close());
-            }, 1500);
+            })
+            .catch(() => {
+                tg.MainButton.hideProgress();
+                tg.showAlert("Ошибка соединения");
+            });
         });
-
-        function updateStats() {
-            const ordersEl = document.getElementById('stat-orders');
-            let orders = parseInt(ordersEl.textContent.replace(/\s/g, ''));
-            ordersEl.textContent = (orders + 1).toLocaleString();
-            
-            const routesEl = document.getElementById('stat-routes');
-            let routes = parseInt(routesEl.textContent.replace(/\s/g, ''));
-            routesEl.textContent = (routes + 1).toLocaleString();
-        }
     </script>
 </body>
 </html>
