@@ -34,13 +34,10 @@
         .glass-nav { background: rgba(250, 248, 245, 0.95); backdrop-filter: blur(16px); }
         @keyframes fadeUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
         .animate-fade-up { animation: fadeUp 0.8s ease forwards; }
-        .delay-100 { animation-delay: 0.1s; }
-        .delay-200 { animation-delay: 0.2s; }
         
         .leaflet-tile-pane { filter: grayscale(30%) sepia(20%) hue-rotate(70deg) saturate(150%); }
         .leaflet-control-zoom { display: none; }
         
-        /* Пульсирующий маркер геолокации */
         .user-location-marker {
             width: 16px; height: 16px;
             background: #5C7A4A;
@@ -82,7 +79,7 @@
             <!-- Map UI Overlay -->
             <div class="absolute top-4 left-4 right-4 z-[1000] flex justify-between items-start pointer-events-none">
                 <div class="glass-panel rounded-xl px-3 py-1.5 text-xs text-warm-600 pointer-events-auto">
-                    Тапните карту, чтобы выбрать <strong id="selecting-label">куда</strong>
+                    Тапните карту или введите адрес вручную
                 </div>
                 <div class="flex flex-col gap-2 pointer-events-auto">
                     <button onclick="zoomIn()" class="w-9 h-9 bg-white rounded-xl shadow-lg flex items-center justify-center text-warm-600 hover:text-sage-600 text-xl font-light">+</button>
@@ -124,7 +121,7 @@
                 <div class="space-y-3 mb-4">
                     <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
                         <div class="w-2.5 h-2.5 bg-sage-500 rounded-full"></div>
-                        <input type="text" id="from-address" placeholder="Откуда (определяется...)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-300 outline-none">
+                        <input type="text" id="from-address" placeholder="Откуда" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-300 outline-none">
                     </div>
                     
                     <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
@@ -148,7 +145,13 @@
                     </div>
                 </div>
                 
-                <p class="text-[10px] text-warm-300 text-center">Тариф: 100 ₽/км • Нажмите на карту для выбора точки</p>
+                <!-- MANUAL ORDER BUTTON (New) -->
+                <button onclick="submitOrder()" class="w-full bg-sage-600 text-white py-3 rounded-xl font-medium hover:bg-sage-700 transition-all shadow-lg flex items-center justify-center gap-2 active:scale-[0.99]">
+                    <iconify-icon icon="lucide:send" class="text-lg"></iconify-icon>
+                    <span>Заказать такси</span>
+                </button>
+                
+                <p class="text-[10px] text-warm-300 text-center mt-3">Тариф: 100 ₽/км • Работает 24/7</p>
             </div>
         </div>
     </section>
@@ -156,12 +159,13 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        tg.MainButton.setText("🚕 Вызвать такси").show();
+        // Скрываем нижнюю кнопку Telegram, так как у нас теперь есть кнопка внутри
+        tg.MainButton.hide(); 
 
         let map;
-        let userMarker = null; // Синий маркер пользователя
-        let fromMarker = null; // Зеленый маркер
-        let toMarker = null;   // Красный маркер
+        let userMarker = null;
+        let fromMarker = null;
+        let toMarker = null;
         let routeLine = null;
         let userCoords = null;
 
@@ -170,53 +174,26 @@
         document.addEventListener('DOMContentLoaded', initMap);
 
         function initMap() {
-            // 1. Инициализация карты (Москва по умолчанию)
             map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
-            
-            // Клик по карте = установка точки "Куда"
             map.on('click', onMapClick);
-
-            // 2. Пробуем найти пользователя сразу
             locateUser();
         }
 
-        // Функция геолокации
         function locateUser() {
-            if (!navigator.geolocation) {
-                tg.showAlert("Геолокация не поддерживается");
-                return;
-            }
-
-            // Показываем загрузку в поле ввода
-            document.getElementById('from-address').placeholder = "Определяем место...";
-
+            if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     const { latitude, longitude } = pos.coords;
                     userCoords = { lat: latitude, lon: longitude };
-                    
-                    // Летим к пользователю
                     map.setView([latitude, longitude], 16);
-
-                    // Ставим красивый маркер "Вы здесь"
                     if (userMarker) map.removeLayer(userMarker);
                     userMarker = L.marker([latitude, longitude], {
-                        icon: L.divIcon({
-                            className: 'user-location-marker',
-                            iconSize: [16, 16],
-                            iconAnchor: [8, 8]
-                        })
+                        icon: L.divIcon({ className: 'user-location-marker', iconSize: [16, 16], iconAnchor: [8, 8] })
                     }).addTo(map);
-
-                    // Автоматически ставим точку "Откуда"
                     setPoint(latitude, longitude, 'from');
                 },
-                (err) => {
-                    console.error(err);
-                    document.getElementById('from-address').placeholder = "Не удалось определить. Выберите на карте.";
-                },
-                { enableHighAccuracy: true, timeout: 10000 }
+                (err) => { console.error(err); }
             );
         }
 
@@ -242,7 +219,6 @@
                 if (toMarker) map.removeLayer(toMarker);
                 toMarker = marker;
                 document.getElementById('to-address').value = "Точка назначения";
-                document.getElementById('selecting-label').innerText = "маршрут готов";
             }
         }
 
@@ -258,10 +234,8 @@
             if (routeLine) map.removeLayer(routeLine);
             routeLine = L.polyline([from, to], { color: '#5C7A4A', weight: 4, dashArray: '10, 10' }).addTo(map);
             
-            // Подгоняем карту под маршрут
             map.fitBounds([from, to], { padding: [80, 80] });
 
-            // Обновляем UI
             document.getElementById('route-distance').textContent = (distance / 1000).toFixed(1) + ' км';
             document.getElementById('route-price').textContent = price + ' ₽';
             document.getElementById('route-info').classList.remove('hidden');
@@ -273,29 +247,32 @@
             toMarker = null; routeLine = null;
             document.getElementById('to-address').value = '';
             document.getElementById('route-info').classList.add('hidden');
-            document.getElementById('selecting-label').innerText = "куда";
         }
         
         function zoomIn() { map.zoomIn(); }
         function zoomOut() { map.zoomOut(); }
 
-        // Логика заказа
-        tg.MainButton.onClick(() => {
+        // Главная функция отправки заказа
+        function submitOrder() {
             const from = document.getElementById('from-address').value;
             const to = document.getElementById('to-address').value;
+            const price = document.getElementById('route-price').textContent || "По договоренности";
             
             if (!from || !to) {
-                tg.showAlert("Выберите куда ехать на карте!");
+                tg.showAlert("Пожалуйста, заполните поля 'Откуда' и 'Куда'.");
                 return;
             }
 
-            tg.MainButton.showProgress();
-            
-            // Обновляем статистику (визуально)
+            // Показываем анимацию загрузки прямо на кнопке (если нужно, можно добавить спиннер)
+            // Но проще заблокировать кнопку
+            const btn = event.currentTarget;
+            btn.disabled = true;
+            btn.innerHTML = '<iconify-icon icon="lucide:loader-2" class="animate-spin text-lg"></iconify-icon> Ищем водителя...';
+
+            // Обновляем статистику
             const o = document.getElementById('stat-orders'); 
             o.textContent = (parseInt(o.textContent.replace(/\s/g, '')) + 1).toLocaleString();
 
-            // Отправляем данные на сервер
             fetch('https://nashe-taxi.vercel.app/api/order', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -303,22 +280,27 @@
                     user: tg.initDataUnsafe.user,
                     from: from,
                     to: to,
-                    price: document.getElementById('route-price').textContent
+                    price: price
                 })
             })
             .then(() => {
-                tg.MainButton.hideProgress();
-                tg.showPopup({
-                    title: "✅ Заказ принят",
-                    message: "Ищем водителей...",
-                    buttons: [{type: "ok"}]
-                }, () => tg.close());
+                btn.disabled = false;
+                btn.innerHTML = '<iconify-icon icon="lucide:check" class="text-lg"></iconify-icon> Заказ принят!';
+                
+                setTimeout(() => {
+                    tg.showPopup({
+                        title: "✅ Успешно",
+                        message: "Ваш заказ передан водителям. Ожидайте звонка!",
+                        buttons: [{type: "ok"}]
+                    }, () => tg.close());
+                }, 500);
             })
             .catch(() => {
-                tg.MainButton.hideProgress();
-                tg.showAlert("Ошибка соединения");
+                btn.disabled = false;
+                btn.innerHTML = '<iconify-icon icon="lucide:send" class="text-lg"></iconify-icon> Заказать такси';
+                tg.showAlert("Ошибка соединения. Проверьте интернет.");
             });
-        });
+        }
     </script>
 </body>
 </html>
