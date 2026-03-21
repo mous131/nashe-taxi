@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Наше Такси</title>
+    <title>Наше Такси - Клиент</title>
     
     <!-- Telegram -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -17,7 +17,6 @@
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
     
-    <!-- КОНФИГУРАЦИЯ ЦВЕТОВ (Это я забыл в прошлом разе) -->
     <script>
         tailwind.config = {
             theme: {
@@ -37,7 +36,6 @@
         body { background-color: #FAF8F5 !important; color: #2A2622 !important; }
         .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.6); }
         
-        /* Анимация маркера */
         .user-marker {
             width: 16px; height: 16px; background: #5C7A4A; border: 3px solid white;
             border-radius: 50%; box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); 
@@ -45,7 +43,6 @@
         }
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(92, 122, 74, 0); } 100% { box-shadow: 0 0 0 0 rgba(92, 122, 74, 0); } }
         
-        /* Скрываем копирайт Leaflet */
         .leaflet-control-attribution { display: none; }
     </style>
 </head>
@@ -60,7 +57,7 @@
                 </div>
                 <span class="font-serif text-lg font-medium text-warm-900">Наше Такси</span>
             </div>
-            <div class="text-xs font-medium text-sage-600 bg-sage-500/10 px-2 py-1 rounded-full">Онлайн</div>
+            <div class="text-xs font-medium text-sage-600 bg-sage-500/10 px-2 py-1 rounded-full">Клиент</div>
         </div>
     </nav>
 
@@ -81,27 +78,17 @@
         <!-- Нижняя панель -->
         <div class="relative z-[1001] bg-beige-50 rounded-t-[2rem] shadow-2xl border-t border-warm-400/10 flex flex-col" style="max-height: 55vh;">
             
-            <!-- Статистика -->
-            <div class="p-3 border-b border-warm-400/10 bg-white/50 rounded-t-[2rem]">
-                <div class="grid grid-cols-4 gap-2 text-center">
-                    <div><p class="text-lg font-serif font-bold text-warm-800">14</p><p class="text-[10px] text-warm-400">Машин</p></div>
-                    <div><p class="text-lg font-serif font-bold text-warm-800">1 204</p><p class="text-[10px] text-warm-400">Заказов</p></div>
-                    <div><p class="text-lg font-serif font-bold text-warm-800">1 180</p><p class="text-[10px] text-warm-400">Поездок</p></div>
-                    <div><p class="text-lg font-serif font-bold text-warm-800">8.5k</p><p class="text-[10px] text-warm-400">Км</p></div>
-                </div>
-            </div>
-
             <div class="p-4 overflow-y-auto">
                 <!-- Поля ввода -->
                 <div class="space-y-3 mb-4">
                     <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
                         <div class="w-2.5 h-2.5 bg-sage-600 rounded-full"></div>
-                        <input type="text" id="from-address" placeholder="Откуда (определяется...)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
+                        <input type="text" id="from-address" placeholder="Определяем местоположение..." class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
                     </div>
                     
                     <div class="flex items-center gap-3 p-3 bg-white rounded-xl border border-warm-100 shadow-sm">
                         <div class="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                        <input type="text" id="to-address" placeholder="Куда едем? (нажмите карту)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
+                        <input type="text" id="to-address" placeholder="Куда едем? (нажмите на карту)" class="w-full bg-transparent text-sm text-warm-800 placeholder:text-warm-400 outline-none" readonly>
                         <button onclick="clearRoute()" class="text-warm-300 hover:text-red-400 p-1">
                             <iconify-icon icon="lucide:x" class="text-lg"></iconify-icon>
                         </button>
@@ -138,8 +125,9 @@
         let routeLine = null;
         
         const PRICE_PER_KM = 100;
+        const API_URL = 'https://ТВОЙ-ПРОЕКТ.vercel.app'; // ЗАМЕНИ НА СВОЙ URL
 
-        // 1. Инициализация карты
+        // Инициализация карты
         document.addEventListener('DOMContentLoaded', () => {
             map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 13);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
@@ -147,7 +135,7 @@
             locateUser();
         });
 
-        // 2. Геолокация
+        // Геолокация
         function locateUser() {
             if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
@@ -161,13 +149,18 @@
                         icon: L.divIcon({ className: 'user-marker', iconSize: [16, 16], iconAnchor: [8, 8] })
                     }).addTo(map);
                     
-                    document.getElementById('from-address').value = "Я здесь";
+                    // Получаем адрес по координатам (обратное геокодирование)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById('from-address').value = data.display_name || 'Текущее местоположение';
+                        });
                 },
                 (err) => { console.log(err); }
             );
         }
 
-        // 3. Клик по карте
+        // Клик по карте (точка назначения)
         function onMapClick(e) {
             const lat = e.latlng.lat;
             const lon = e.latlng.lng;
@@ -180,11 +173,16 @@
                 })
             }).addTo(map);
             
-            document.getElementById('to-address').value = "Точка назначения";
-            calculateRoute();
+            // Получаем адрес
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('to-address').value = data.display_name || 'Точка назначения';
+                    calculateRoute();
+                });
         }
 
-        // 4. Расчет маршрута
+        // Расчет маршрута
         function calculateRoute() {
             if (!fromMarker || !toMarker) return;
             
@@ -210,14 +208,14 @@
             document.getElementById('route-info').classList.add('hidden');
         }
 
-        // 5. Отправка заказа
+        // Отправка заказа
         function submitOrder() {
             const btn = document.getElementById('order-btn');
             const from = document.getElementById('from-address').value;
             const to = document.getElementById('to-address').value;
             const price = document.getElementById('route-price').textContent;
 
-            if (!from || !to) {
+            if (!from || !to || from.includes('Определяем')) {
                 tg.showAlert("Выберите маршрут на карте.");
                 return;
             }
@@ -225,7 +223,7 @@
             btn.disabled = true;
             btn.innerHTML = "Отправка...";
 
-            fetch('https://nashe-taxi.vercel.app/api/order', {
+            fetch(`${API_URL}/api/order`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -237,13 +235,19 @@
             })
             .then(res => res.json())
             .then(data => {
-                btn.innerHTML = "Готово!";
-                tg.showAlert("Заказ принят! Ожидайте звонка.");
+                btn.innerHTML = "✓ Заказ принят!";
+                tg.showAlert("Заказ принят! Ищем водителя.");
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = "Заказать такси";
+                    clearRoute();
+                }, 3000);
             })
             .catch(e => {
+                console.error(e);
                 btn.disabled = false;
                 btn.innerHTML = "Заказать такси";
-                tg.showAlert("Ошибка соединения.");
+                tg.showAlert("Ошибка соединения. Попробуйте снова.");
             });
         }
     </script>
