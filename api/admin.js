@@ -2,42 +2,55 @@ const { Telegraf } = require('telegraf');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
-    return res.status(200).send('Server works!');
+    return res.status(200).send('Admin bot works!');
   }
 
   try {
-    const BOT_TOKEN = process.env.BOT_TOKEN;
-    if (!BOT_TOKEN) {
-      console.error('BOT_TOKEN not found');
-      return res.status(500).send('Server config error');
+    const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+    const ADMIN_ID = process.env.ADMIN_ID;
+
+    if (!ADMIN_TOKEN) {
+      return res.status(500).send('Admin token not configured');
     }
 
-    const WEB_APP_URL = 'https://mous131.github.io/nashe-taxi/'; // ТВОЙ URL НА GITHUB
-    const bot = new Telegraf(BOT_TOKEN);
+    const bot = new Telegraf(ADMIN_TOKEN);
     const body = req.body;
 
     if (body && body.message && body.message.text === '/start') {
       const chatId = body.message.chat.id;
-      const firstName = body.message.from.first_name;
-
-      await bot.telegram.sendMessage(chatId, 
-        `👋 *Привет, ${firstName}!*\n\n` +
-        `Добро пожаловать в «Наше Такси».\n` +
-        `Нажмите кнопку ниже, чтобы вызвать машину.`, 
-        {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🚕 Вызвать такси", web_app: { url: WEB_APP_URL } }]
-            ]
-          }
-        }
-      );
+      
+      // Проверяем, админ ли это
+      if (chatId.toString() === ADMIN_ID) {
+        await bot.telegram.sendMessage(chatId,
+          `🛡 *Панель администратора*\n\n` +
+          `Доступные команды:\n` +
+          `/stats - статистика\n` +
+          `/drivers - список водителей\n` +
+          `/broadcast - рассылка`,
+          { parse_mode: 'Markdown' }
+        );
+      } else {
+        await bot.telegram.sendMessage(chatId, "У вас нет доступа к панели администратора.");
+      }
+    }
+    
+    // Статистика
+    if (body && body.message && body.message.text === '/stats') {
+      const chatId = body.message.chat.id;
+      if (chatId.toString() === ADMIN_ID) {
+        await bot.telegram.sendMessage(chatId,
+          `📊 *Статистика*\n\n` +
+          `Заказов сегодня: 0\n` +
+          `Водителей онлайн: 0\n` +
+          `Выручка: 0 ₽`,
+          { parse_mode: 'Markdown' }
+        );
+      }
     }
     
     res.status(200).send('OK');
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).send('Internal Error');
+    console.error('Admin bot error:', error);
+    res.status(500).send('Error');
   }
 };
