@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Наше Такси - Водитель</title>
+    
+    <!-- Telegram -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Карта -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Стили -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+    
+    <style>
+        body { background-color: #1a1a1a !important; color: #ffffff !important; }
+        .glass-panel { background: rgba(30, 30, 30, 0.95); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .driver-marker {
+            width: 20px; height: 20px; background: #3b82f6; border: 3px solid white;
+            border-radius: 50%; box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); } 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); } }
+        .order-marker {
+            width: 20px; height: 20px; background: #ef4444; border: 3px solid white;
+            border-radius: 50%;
+        }
+        .leaflet-control-attribution { display: none; }
+    </style>
+</head>
+<body class="font-sans antialiased">
+    
+    <!-- Шапка -->
+    <nav class="fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                    <iconify-icon icon="lucide:car" class="text-white"></iconify-icon>
+                </div>
+                <span class="font-semibold text-white">Наше Такси - Водитель</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="status-badge" class="text-xs font-medium bg-green-600 px-2 py-1 rounded-full">На линии</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной блок -->
+    <section class="pt-14 min-h-screen flex flex-col">
+        <!-- Карта -->
+        <div class="flex-1 relative">
+            <div id="map" style="height: 100%; width: 100%; position: absolute; top:0; left:0; z-index: 1;"></div>
+            
+            <!-- Кнопки -->
+            <div class="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                <button onclick="locateDriver()" class="w-10 h-10 bg-gray-800 rounded-xl shadow-lg flex items-center justify-center text-blue-400 hover:text-blue-300">
+                    <iconify-icon icon="lucide:locate" class="text-xl"></iconify-icon>
+                </button>
+                <button onclick="toggleStatus()" id="status-btn" class="w-10 h-10 bg-gray-800 rounded-xl shadow-lg flex items-center justify-center text-green-400 hover:text-green-300">
+                    <iconify-icon icon="lucide:power" class="text-xl"></iconify-icon>
+                </button>
+            </div>
+        </div>
+
+        <!-- Нижняя панель с заказами -->
+        <div class="relative z-[1001] bg-gray-900 rounded-t-[2rem] shadow-2xl border-t border-white/10 flex flex-col" style="max-height: 50vh;">
+            
+            <!-- Статистика -->
+            <div class="p-3 border-b border-white/10 bg-gray-800/50 rounded-t-[2rem]">
+                <div class="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                        <p class="text-lg font-bold text-white" id="active-orders-count">0</p>
+                        <p class="text-[10px] text-gray-400">Активных</p>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-white" id="completed-today">0</p>
+                        <p class="text-[10px] text-gray-400">Завершено</p>
+                    </div>
+                    <div>
+                        <p class="text-lg font-bold text-white" id="earnings-today">0 ₽</p>
+                        <p class="text-[10px] text-gray-400">Заработано</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Список заказов -->
+            <div class="p-4 overflow-y-auto">
+                <h3 class="text-sm font-medium text-gray-400 mb-3">Доступные заказы</h3>
+                <div id="orders-list" class="space-y-3">
+                    <!-- Заказы будут подгружаться сюда -->
+                    <div class="text-center text-gray-500 py-4">
+                        Загрузка заказов...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        
+        let map;
+        let driverMarker = null;
+        let orderMarkers = [];
+        let isOnline = true;
+        const API_URL = 'https://ТВОЙ-ПРОЕКТ.vercel.app'; // ЗАМЕНИ НА СВОЙ URL
+        
+        // Инициализация
+        document.addEventListener('DOMContentLoaded', () => {
+            map = L.map('map', { zoomControl: false }).setView([55.75, 37.61], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '' }).addTo(map);
+            
+            locateDriver();
+            loadActiveOrders();
+            
+            // Обновляем заказы каждые 10 секунд
+            setInterval(loadActiveOrders, 10000);
+        });
+
+        // Геолокация водителя
+        function locateDriver() {
+            if (!navigator.geolocation) return;
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    map.setView([lat, lon], 14);
+                    
+                    if (driverMarker) map.removeLayer(driverMarker);
+                    driverMarker = L.marker([lat, lon], {
+                        icon: L.divIcon({ className: 'driver-marker', iconSize: [20, 20], iconAnchor: [10, 10] })
+                    }).addTo(map);
+                    
+                    // Отправляем координаты на сервер
+                    if (isOnline) {
+                        fetch(`${API_URL}/api/driver-location`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                driverId: tg.initDataUnsafe.user?.id,
+                                lat: lat,
+                                lon: lon
+                            })
+                        });
+                    }
+                }
+            );
+        }
+
+        // Загрузка активных заказов
+        function loadActiveOrders() {
+            fetch(`${API_URL}/api/active-orders`)
+                .then(res => res.json())
+                .then(data => {
+                    displayOrders(data.orders || []);
+                })
+                .catch(e => console.error('Error loading orders:', e));
+        }
+
+        // Отображение заказов на карте и в списке
+        function displayOrders(orders) {
+            // Очищаем старые маркеры
+            orderMarkers.forEach(marker => map.removeLayer(marker));
+            orderMarkers = [];
+            
+            const ordersList = document.getElementById('orders-list');
+            ordersList.innerHTML = '';
+            
+            if (orders.length === 0) {
+                ordersList.innerHTML = '<div class="text-center text-gray-500 py-4">Нет активных заказов</div>';
+                document.getElementById('active-orders-count').textContent = '0';
+                return;
+            }
+            
+            document.getElementById('active-orders-count').textContent = orders.length;
+            
+            orders.forEach(order => {
+                // Добавляем маркер на карту
+                if (order.lat && order.lon) {
+                    const marker = L.marker([order.lat, order.lon], {
+                        icon: L.divIcon({ 
+                            className: 'order-marker',
+                            html: `<div style="width:20px;height:20px;background:#ef4444;border:3px solid white;border-radius:50%;"></div>`,
+                            iconSize: [20, 20], 
+                            iconAnchor: [10, 10]
+                        })
+                    }).addTo(map);
+                    
+                    marker.bindPopup(`
+                        <b>Заказ #${order.id}</b><br>
+                        От: ${order.from}<br>
+                        До: ${order.to}<br>
+                        Цена: ${order.price}
+                    `);
+                    
+                    orderMarkers.push(marker);
+                }
+                
+                // Добавляем в список
+                const orderCard = document.createElement('div');
+                orderCard.className = 'bg-gray-800 rounded-xl p-3 border border-gray-700';
+                orderCard.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs text-gray-400">Заказ #${order.id}</span>
+                        <span class="text-sm font-bold text-green-400">${order.price}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-1">📍 Откуда:</p>
+                    <p class="text-sm text-white mb-2">${order.from}</p>
+                    <p class="text-xs text-gray-400 mb-1">🏁 Куда:</p>
+                    <p class="text-sm text-white mb-3">${order.to}</p>
+                    <button onclick="acceptOrder('${order.id}')" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+                        Принять заказ
+                    </button>
+                `;
+                ordersList.appendChild(orderCard);
+            });
+        }
+
+        // Принять заказ
+        function acceptOrder(orderId) {
+            fetch(`${API_URL}/api/accept-order`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    driverId: tg.initDataUnsafe.user?.id,
+                    driverName: tg.initDataUnsafe.user?.first_name
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    tg.showAlert("Заказ принят! Свяжитесь с клиентом.");
+                    loadActiveOrders();
+                }
+            });
+        }
+
+        // Вкл/Выкл статуса
+        function toggleStatus() {
+            isOnline = !isOnline;
+            const badge = document.getElementById('status-badge');
+            const btn = document.getElementById('status-btn');
+            
+            if (isOnline) {
+                badge.className = 'text-xs font-medium bg-green-600 px-2 py-1 rounded-full';
+                badge.textContent = 'На линии';
+                btn.className = 'w-10 h-10 bg-gray-800 rounded-xl shadow-lg flex items-center justify-center text-green-400 hover:text-green-300';
+                locateDriver();
+                loadActiveOrders();
+            } else {
+                badge.className = 'text-xs font-medium bg-gray-600 px-2 py-1 rounded-full';
+                badge.textContent = 'Не на линии';
+                btn.className = 'w-10 h-10 bg-gray-800 rounded-xl shadow-lg flex items-center justify-center text-gray-400 hover:text-gray-300';
+            }
+        }
+    </script>
+</body>
+</html>
