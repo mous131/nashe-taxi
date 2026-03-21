@@ -87,3 +87,23 @@ module.exports = async (req, res) => {
         });
     }
 };
+// api/order.js - добавить в начало файла
+const fetch = require('node-fetch'); // если нужно, установите: npm install node-fetch
+
+// В функции создания заказа, перед сохранением, добавьте:
+async function calculateOptimalPrice(distance) {
+    try {
+        const response = await fetch(`${process.env.VERCEL_URL}/api/calculate-price`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ distance })
+        });
+        const data = await response.json();
+        return data.tariffs?.economy || distance * 50;
+    } catch (error) {
+        return distance * 50; // fallback цена
+    }
+}
+
+// В вашем существующем коде, где создается заказ:
+const optimalPrice = await calculateOptimalPrice(distance);
