@@ -5,32 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Наше Такси - Заказ</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://api-maps.yandex.ru/2.1/?apikey=ваш_api_ключ&lang=ru_RU" type="text/javascript"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .ymaps-2-1-79-map {
+        .custom-marker {
+            background: none;
+            border: none;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+        }
+        
+        /* Полностью скрываем водяной знак */
+        .leaflet-control-attribution {
+            display: none !important;
+        }
+        
+        /* Стили для карты */
+        #map {
             width: 100%;
-            height: 100%;
+            height: 350px;
         }
     </style>
 </head>
 <body class="bg-gray-100">
     <div class="max-w-md mx-auto bg-white min-h-screen">
-        <!-- Шапка -->
-        <div class="bg-blue-600 text-white p-4 sticky top-0 z-10">
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4 sticky top-0 z-10 shadow-lg">
             <h1 class="text-xl font-bold">🚕 Наше Такси</h1>
-            <p class="text-sm opacity-90">Выберите место назначения на карте</p>
+            <p class="text-sm opacity-90">Нажмите на карту, чтобы выбрать место назначения</p>
         </div>
         
-        <!-- Карта -->
-        <div id="map" style="width: 100%; height: 300px;"></div>
+        <div id="map"></div>
         
-        <!-- Форма заказа -->
         <div class="p-4">
             <div class="bg-white rounded-lg shadow-md p-4 mb-4">
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-gray-700 mb-1">📍 Откуда</label>
-                    <input type="text" id="fromInput" placeholder="Ваше местоположение" 
+                    <input type="text" id="fromInput" placeholder="Определяется..." 
                            class="w-full p-2 border rounded-lg bg-gray-50" readonly>
                 </div>
                 <div class="mb-3">
@@ -40,21 +52,19 @@
                 </div>
             </div>
             
-            <!-- Информация о поездке -->
-            <div id="tripInfo" class="bg-gray-50 rounded-lg p-4 mb-4 hidden">
+            <div id="tripInfo" class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg p-4 mb-4 hidden">
                 <div class="flex justify-between mb-2">
                     <span class="text-gray-600">📏 Расстояние:</span>
-                    <span id="distance" class="font-semibold">0 км</span>
+                    <span id="distance" class="font-semibold text-gray-800">0 км</span>
                 </div>
-                <div class="flex justify-between border-t pt-2 mt-2">
-                    <span class="text-lg font-bold">💰 Стоимость:</span>
+                <div class="flex justify-between border-t pt-2 mt-2 border-gray-200">
+                    <span class="text-lg font-bold text-gray-800">💰 Стоимость:</span>
                     <span id="price" class="text-2xl font-bold text-green-600">0 ₽</span>
                 </div>
             </div>
             
-            <button id="orderBtn" 
-                    disabled 
-                    class="w-full bg-blue-500 text-white py-3 rounded-lg font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-600 transition">
+            <button id="orderBtn" disabled 
+                    class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 rounded-lg font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-blue-600 hover:to-blue-700 transition-all shadow-md">
                 Заказать
             </button>
         </div>
@@ -67,189 +77,158 @@
         
         const API_URL = 'https://mous131s-projects.vercel.app';
         let map;
-        let fromPoint, toPoint;
-        let fromPlacemark, toPlacemark;
-        let currentRoute;
+        let fromMarker, toMarker;
+        let fromCoords, toCoords;
         
-        // Функция для расчета расстояния между двумя точками
-        function calculateDistance(point1, point2) {
+        // Расчет расстояния между двумя точками (формула гаверсинусов)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; // Радиус Земли в км
-            const lat1 = point1.latitude * Math.PI / 180;
-            const lat2 = point2.latitude * Math.PI / 180;
-            const deltaLat = (point2.latitude - point1.latitude) * Math.PI / 180;
-            const deltaLon = (point2.longitude - point1.longitude) * Math.PI / 180;
-            
-            const a = Math.sin(deltaLat/2) * Math.sin(deltaLat/2) +
-                      Math.cos(lat1) * Math.cos(lat2) *
-                      Math.sin(deltaLon/2) * Math.sin(deltaLon/2);
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             return R * c;
         }
         
-        // Функция расчета стоимости
+        // Расчет стоимости поездки
         function calculatePrice(distance) {
-            const basePrice = 99;
-            const pricePerKm = 50;
-            return Math.round(basePrice + (distance * pricePerKm));
+            const basePrice = 99; // Базовая стоимость
+            const pricePerKm = 50; // Цена за км
+            let price = basePrice + (distance * pricePerKm);
+            
+            // Коэффициент времени суток
+            const hour = new Date().getHours();
+            if (hour >= 23 || hour <= 5) {
+                price *= 1.2; // Ночной тариф +20%
+            } else if ((hour >= 8 && hour <= 10) || (hour >= 17 && hour <= 19)) {
+                price *= 1.3; // Час пик +30%
+            }
+            
+            return Math.round(price);
         }
         
-        // Инициализация Яндекс.Карты
-        ymaps.ready(init);
-        
-        function init() {
-            // Определяем местоположение пользователя
-            let userLocation = [55.751244, 37.618423]; // Москва по умолчанию
+        // Инициализация карты
+        function initMap() {
+            // Слой карты с красивым оформлением
+            const mapLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '', // Убираем атрибуцию из слоя
+                subdomains: 'abcd',
+                maxZoom: 19,
+                minZoom: 1
+            });
             
+            map = L.map('map', {
+                attributionControl: false // Отключаем стандартный контрол атрибуции
+            }).setView([55.751244, 37.618423], 12);
+            
+            mapLayer.addTo(map);
+            
+            // Добавляем масштаб без атрибуции
+            L.control.scale({ metric: true, imperial: false, position: 'bottomleft' }).addTo(map);
+            
+            // Получаем геопозицию пользователя
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
-                    userLocation = [position.coords.latitude, position.coords.longitude];
-                    map.setCenter(userLocation, 14);
+                    const { latitude, longitude } = position.coords;
+                    map.setView([latitude, longitude], 14);
+                    setFromPoint(latitude, longitude);
                     
-                    // Устанавливаем точку отправления
-                    fromPoint = {
-                        latitude: userLocation[0],
-                        longitude: userLocation[1]
-                    };
-                    
-                    // Создаем метку отправления
-                    if (fromPlacemark) {
-                        map.geoObjects.remove(fromPlacemark);
-                    }
-                    
-                    fromPlacemark = new ymaps.Placemark(userLocation, {
-                        balloonContent: 'Ваше местоположение',
-                        iconContent: '📍'
-                    }, {
-                        preset: 'islands#greenStretchyIcon',
-                        iconColor: '#00ff00'
-                    });
-                    
-                    map.geoObjects.add(fromPlacemark);
-                    
-                    // Обновляем поле "Откуда"
-                    getAddressFromCoords(userLocation[0], userLocation[1], (address) => {
-                        document.getElementById('fromInput').value = address;
-                    });
+                    // Получаем адрес по координатам (обратный геокодинг)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const address = data.display_name || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                            document.getElementById('fromInput').value = address;
+                        })
+                        .catch(() => {
+                            document.getElementById('fromInput').value = `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+                        });
+                }, (error) => {
+                    console.error('Geolocation error:', error);
+                    setFromPoint(55.751244, 37.618423);
+                    document.getElementById('fromInput').value = 'Москва, центр';
                 });
+            } else {
+                setFromPoint(55.751244, 37.618423);
+                document.getElementById('fromInput').value = 'Москва, центр';
             }
-            
-            // Создаем карту
-            map = new ymaps.Map('map', {
-                center: userLocation,
-                zoom: 12,
-                controls: ['zoomControl', 'fullscreenControl']
-            });
             
             // Обработка клика на карте
-            map.events.add('click', (e) => {
-                const coords = e.get('coords');
-                
-                toPoint = {
-                    latitude: coords[0],
-                    longitude: coords[1]
-                };
-                
-                // Удаляем старую метку назначения
-                if (toPlacemark) {
-                    map.geoObjects.remove(toPlacemark);
-                }
-                
-                // Создаем новую метку назначения
-                toPlacemark = new ymaps.Placemark(coords, {
-                    balloonContent: 'Место назначения',
-                    iconContent: '🎯'
-                }, {
-                    preset: 'islands#redStretchyIcon',
-                    iconColor: '#ff0000'
-                });
-                
-                map.geoObjects.add(toPlacemark);
-                
-                // Получаем адрес
-                getAddressFromCoords(coords[0], coords[1], (address) => {
+            map.on('click', (e) => {
+                const { lat, lng } = e.latlng;
+                setToPoint(lat, lng);
+            });
+        }
+        
+        // Установка точки отправления
+        function setFromPoint(lat, lng) {
+            if (fromMarker) map.removeLayer(fromMarker);
+            
+            const customIcon = L.divIcon({
+                html: '<div style="background-color: #10b981; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>',
+                iconSize: [24, 24],
+                className: 'custom-marker'
+            });
+            
+            fromMarker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+            fromMarker.bindPopup('<b>📍 Откуда</b><br>Ваше местоположение');
+            fromCoords = { lat, lng };
+        }
+        
+        // Установка точки назначения
+        function setToPoint(lat, lng) {
+            if (toMarker) map.removeLayer(toMarker);
+            
+            const customIcon = L.divIcon({
+                html: '<div style="background-color: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"></div>',
+                iconSize: [24, 24],
+                className: 'custom-marker'
+            });
+            
+            toMarker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+            toMarker.bindPopup('<b>🎯 Куда</b><br>Место назначения');
+            toCoords = { lat, lng };
+            
+            // Получаем адрес по координатам
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`)
+                .then(res => res.json())
+                .then(data => {
+                    const address = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     document.getElementById('toInput').value = address;
+                })
+                .catch(() => {
+                    document.getElementById('toInput').value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                 });
-                
-                // Если есть точка отправления, строим маршрут и рассчитываем стоимость
-                if (fromPoint) {
-                    buildRouteAndCalculate();
-                }
-            });
             
-            // Если геолокация не сработала, ставим точку по умолчанию
-            if (!fromPoint) {
-                fromPoint = {
-                    latitude: userLocation[0],
-                    longitude: userLocation[1]
-                };
-                
-                fromPlacemark = new ymaps.Placemark(userLocation, {
-                    balloonContent: 'Ваше местоположение',
-                    iconContent: '📍'
-                }, {
-                    preset: 'islands#greenStretchyIcon'
-                });
-                
-                map.geoObjects.add(fromPlacemark);
-                
-                getAddressFromCoords(userLocation[0], userLocation[1], (address) => {
-                    document.getElementById('fromInput').value = address;
-                });
-            }
-        }
-        
-        // Получение адреса по координатам
-        function getAddressFromCoords(lat, lon, callback) {
-            ymaps.geocode([lat, lon]).then((res) => {
-                const firstGeoObject = res.geoObjects.get(0);
-                const address = firstGeoObject.getAddressLine();
-                callback(address);
-            }).catch((error) => {
-                console.error('Geocoding error:', error);
-                callback(`${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-            });
-        }
-        
-        // Построение маршрута и расчет стоимости
-        function buildRouteAndCalculate() {
-            if (!fromPoint || !toPoint) return;
-            
-            // Удаляем старый маршрут
-            if (currentRoute) {
-                map.geoObjects.remove(currentRoute);
-            }
-            
-            // Строим маршрут
-            ymaps.route([
-                [fromPoint.latitude, fromPoint.longitude],
-                [toPoint.latitude, toPoint.longitude]
-            ], {
-                mapStateAutoApply: true
-            }).then((route) => {
-                currentRoute = route;
-                map.geoObjects.add(route);
-                
-                // Получаем расстояние
-                const distance = route.getLength() / 1000; // в км
+            if (fromCoords) {
+                const distance = calculateDistance(fromCoords.lat, fromCoords.lng, lat, lng);
                 const price = calculatePrice(distance);
                 
-                // Показываем информацию
                 document.getElementById('tripInfo').classList.remove('hidden');
                 document.getElementById('distance').textContent = `${distance.toFixed(1)} км`;
                 document.getElementById('price').textContent = `${price} ₽`;
-                
-                // Активируем кнопку
                 document.getElementById('orderBtn').disabled = false;
                 
-            }).catch((error) => {
-                console.error('Route error:', error);
-                tg.showAlert('Не удалось построить маршрут');
-            });
+                // Рисуем линию маршрута
+                if (window.routeLine) map.removeLayer(window.routeLine);
+                
+                window.routeLine = L.polyline([[fromCoords.lat, fromCoords.lng], [lat, lng]], {
+                    color: '#3b82f6',
+                    weight: 4,
+                    opacity: 0.7,
+                    dashArray: '5, 10'
+                }).addTo(map);
+                
+                // Адаптируем карту под маршрут
+                map.fitBounds(window.routeLine.getBounds(), { padding: [50, 50] });
+            }
         }
         
         // Оформление заказа
         async function placeOrder() {
-            if (!fromPoint || !toPoint) {
+            if (!fromCoords || !toCoords) {
                 tg.showAlert('Пожалуйста, выберите место назначения');
                 return;
             }
@@ -257,27 +236,31 @@
             const orderData = {
                 from: document.getElementById('fromInput').value,
                 to: document.getElementById('toInput').value,
-                fromCoords: [fromPoint.latitude, fromPoint.longitude],
-                toCoords: [toPoint.latitude, toPoint.longitude],
+                fromCoords: [fromCoords.lat, fromCoords.lng],
+                toCoords: [toCoords.lat, toCoords.lng],
                 distance: parseFloat(document.getElementById('distance').textContent),
                 price: parseInt(document.getElementById('price').textContent),
                 userId: tg.initDataUnsafe?.user?.id || 'anonymous',
-                userName: tg.initDataUnsafe?.user?.first_name || 'Клиент'
+                userName: tg.initDataUnsafe?.user?.first_name || 'Клиент',
+                userPhone: tg.initDataUnsafe?.user?.phone_number || '',
+                timestamp: new Date().toISOString()
             };
+            
+            const orderBtn = document.getElementById('orderBtn');
+            orderBtn.disabled = true;
+            orderBtn.textContent = 'Отправляем...';
             
             try {
                 const response = await fetch(`${API_URL}/api/order`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(orderData)
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    tg.showAlert(`✅ Заказ #${data.orderId} создан! Водитель скоро прибудет.`);
+                    tg.showAlert(`✅ Заказ #${data.orderId} создан!\nВодитель скоро прибудет.`);
                     
                     // Отправляем данные обратно в бот
                     tg.sendData(JSON.stringify({
@@ -291,16 +274,29 @@
                         tg.close();
                     }, 2000);
                 } else {
-                    tg.showAlert('❌ Ошибка создания заказа');
+                    tg.showAlert('❌ Ошибка создания заказа\n' + (data.error || 'Попробуйте позже'));
+                    orderBtn.disabled = false;
+                    orderBtn.textContent = 'Заказать';
                 }
             } catch (error) {
                 console.error('Error placing order:', error);
-                tg.showAlert('❌ Ошибка соединения. Попробуйте позже.');
+                tg.showAlert('❌ Ошибка соединения\nПроверьте интернет и попробуйте снова');
+                orderBtn.disabled = false;
+                orderBtn.textContent = 'Заказать';
             }
         }
         
-        // Вешаем обработчик на кнопку
+        // Запуск приложения
+        initMap();
         document.getElementById('orderBtn').addEventListener('click', placeOrder);
+        
+        // Обработка закрытия приложения
+        tg.onEvent('viewportChanged', () => {
+            tg.expand();
+        });
+        
+        // Показываем, что приложение готово
+        tg.ready();
     </script>
 </body>
 </html>
