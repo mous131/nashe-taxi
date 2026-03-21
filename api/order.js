@@ -57,4 +57,33 @@ module.exports = async (req, res) => {
                         { text: "❌ Отклонить", callback_data: `reject_${Date.now()}` }
                     ]
                 ]
-           
+            }
+        });
+        
+        // Отправляем админу
+        await adminBot.telegram.sendMessage(ADMIN_ID, orderMsg, { parse_mode: 'HTML' });
+
+        // Отправляем подтверждение клиенту
+        try {
+            const clientBot = new Telegraf(CLIENT_TOKEN);
+            await clientBot.telegram.sendMessage(
+                data.user?.id, 
+                "✅ Ваш заказ принят! Ищем ближайшего водителя.\n\nОжидайте, скоро с вами свяжутся."
+            );
+        } catch (e) {
+            console.log('Не удалось отправить сообщение клиенту');
+        }
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Заказ отправлен водителям' 
+        });
+        
+    } catch (error) {
+        console.error('Order error:', error);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            details: error.message 
+        });
+    }
+};
