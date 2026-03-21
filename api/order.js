@@ -1,9 +1,8 @@
-// api/order.js
 const { Telegraf } = require('telegraf');
 
 module.exports = async (req, res) => {
-    // Разрешаем CORS для твоего GitHub Pages
-    res.setHeader('Access-Control-Allow-Origin', 'https://mous131.github.io');
+    // Разрешаем CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
@@ -18,14 +17,13 @@ module.exports = async (req, res) => {
     try {
         const data = req.body;
         
-        // Берем токены из переменных окружения
+        // Получаем токены из переменных окружения
         const DRIVER_ID = process.env.DRIVER_ID;
         const ADMIN_ID = process.env.ADMIN_ID;
         const DRIVER_TOKEN = process.env.DRIVER_TOKEN;
         const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
         const CLIENT_TOKEN = process.env.BOT_TOKEN;
 
-        // Проверяем, что все токены есть
         if (!DRIVER_TOKEN || !ADMIN_TOKEN || !CLIENT_TOKEN) {
             console.error('Missing tokens');
             return res.status(500).json({ error: 'Server configuration error' });
@@ -49,45 +47,14 @@ module.exports = async (req, res) => {
 ⏰ <b>Время:</b> ${new Date().toLocaleString('ru-RU')}
         `;
 
-        // Отправляем водителю с кнопками
+        // Отправляем водителю
         await driverBot.telegram.sendMessage(DRIVER_ID, orderMsg, { 
             parse_mode: 'HTML',
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: "✅ Принять заказ", callback_data: `accept_${data.user?.id}` },
-                        { text: "❌ Отклонить", callback_data: `reject_${data.user?.id}` }
+                        { text: "✅ Принять заказ", callback_data: `accept_${Date.now()}` },
+                        { text: "❌ Отклонить", callback_data: `reject_${Date.now()}` }
                     ]
                 ]
-            }
-        });
-        
-        // Отправляем админу (просто уведомление)
-        await adminBot.telegram.sendMessage(ADMIN_ID, orderMsg, { 
-            parse_mode: 'HTML'
-        });
-
-        // Отправляем подтверждение клиенту (через клиентского бота)
-        try {
-            const clientBot = new Telegraf(CLIENT_TOKEN);
-            await clientBot.telegram.sendMessage(
-                data.user?.id, 
-                "✅ Ваш заказ принят! Ищем ближайшего водителя..."
-            );
-        } catch (e) {
-            console.log('Не удалось отправить сообщение клиенту:', e.message);
-        }
-
-        res.status(200).json({ 
-            success: true, 
-            message: 'Заказ отправлен водителям' 
-        });
-        
-    } catch (error) {
-        console.error('Order error:', error);
-        res.status(500).json({ 
-            error: 'Internal server error',
-            details: error.message 
-        });
-    }
-};
+           
